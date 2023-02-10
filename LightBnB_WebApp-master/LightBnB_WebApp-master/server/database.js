@@ -98,9 +98,74 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = (options, limit = 10) => {
-  return pool
-    .query(`SELECT * FROM properties LIMIT $1`, [limit])
+  // 1
+  const queryParams = [];
+  // 2
+  let queryString = `
+   SELECT properties.*, avg(property_reviews.rating) as average_rating
+   FROM properties
+   JOIN property_reviews ON properties.id = property_id
+   `;
+
+  // 3
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length} `;
+  }
+
+  // C1
+  if (options.owner_id) {
+    queryParams.push(`${options.owner_id}`);
+    if (queryParams.length === 1) {
+      queryString += `WHERE `;
+    } else {
+      queryString += `AND `;
+    }
+    queryString += `owner_id = $${queryParams.length} `;
+  }
+
+  // C2
+  if (options.minimum_price_per_night) {
+    queryParams.push(`${options.minimum_price_per_night * 100}`);
+    if (queryParams.length === 1) {
+      queryString += `WHERE `;
+    } else {
+      queryString += `AND `;
+    }
+    queryString += `cost_per_night >= $${queryParams.length} `;
+  }
+  if (options.maximum_price_per_night) {
+    queryParams.push(`${options.maximum_price_per_night * 100}`);
+    if (queryParams.length === 1) {
+      queryString += `WHERE `;
+    } else {
+      queryString += `AND `;
+    }
+    queryString += `cost_per_night <= $${queryParams.length} `;
+  }
+
+  queryString += `GROUP BY properties.id `;
+
+  // C3
+  if (options.minimum_rating) {
+    queryParams.push(`${options.minimum_rating}`);
+    queryString += `HAVING avg(rating) >= $${queryParams.length} `;
+  }
+
+  // 4
+  queryParams.push(limit);
+  queryString += `   
+   ORDER BY cost_per_night
+   LIMIT $${queryParams.length};
+   `;
+
+  // 5
+  console.log(queryString, queryParams);
+
+  // 6
+  return pool.query(queryString, queryParams)
     .then((result) => {
+      console.log(result.rows.length);
       return result.rows;
     })
     .catch((err) => {
