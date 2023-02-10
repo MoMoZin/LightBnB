@@ -104,7 +104,7 @@ const getAllProperties = (options, limit = 10) => {
   let queryString = `
    SELECT properties.*, avg(property_reviews.rating) as average_rating
    FROM properties
-   JOIN property_reviews ON properties.id = property_id
+   LEFT JOIN property_reviews ON properties.id = property_id
    `;
 
   // 3
@@ -182,9 +182,47 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  // const propertyId = Object.keys(properties).length + 1;
+  // property.id = propertyId;
+  // properties[propertyId] = property;
+  // return Promise.resolve(property);
+  // console.log("property: ", property);
+  const keys = Object.keys(property);
+  const values = Object.values(property);
+  console.log("keys: ", keys);
+  let columns = "";
+  let valuePlaceHolder = "";
+  let i = 1;
+  keys.forEach(key => {
+    columns += key.replace("'", "");
+    columns += ",";
+
+    valuePlaceHolder += `$${i},`;
+    i++;
+  });
+  // console.log("columns: ", columns);
+  // console.log("columns: ", columns);
+  columns = columns.slice(0, -1);
+  valuePlaceHolder = valuePlaceHolder.slice(0, -1);
+  // console.log("columns: ", columns);
+  const queryString = `
+  INSERT INTO properties 
+  (${columns}) 
+  VALUES (${valuePlaceHolder}) RETURNING *;
+  `;
+
+  console.log("queryString: ", queryString);
+  console.log("values: ", values);
+  return pool.query(queryString, values)
+    .then((result) => {
+      if (result.rows.length === 0) {
+        return null;
+      }
+      return result.rows[0];
+    })
+    .catch((err) => console.log(err.message));
+
 };
 exports.addProperty = addProperty;
+
+
